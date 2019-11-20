@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_session_form_pos_masivo" model="ir.ui.view">
+        <field name="name">pos.session.form.view_pos_masivo</field>
+        <field name="model">pos.session</field>
+        <field name="inherit_id" ref="point_of_sale.view_pos_session_form"/>
+        <field name="arch" type="xml">
+            <field name="stop_at" position="after">
+                <field name="order_picking_id"/>
+                <field name="return_picking_id"/>
+            </field>
+        </field>
+    </record>
+</odoo>
