@@ -71,6 +71,7 @@ class PosSession(models.Model):
                     'move_type': 'direct',
                     'location_id': location_id,
                     'location_dest_id': destination_id,
+                    'cuenta_analitica_id': session.config_id.analytic_account_id.id if session.config_id.analytic_account_id else False,
                 }
                 pos_qty = any([x['qty'] > 0 for x in lineas if x['product_id'].type in ['product', 'consu']])
                 if pos_qty:
