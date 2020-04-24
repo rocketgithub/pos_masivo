@@ -20,6 +20,11 @@ class PosSession(models.Model):
     def create_picking(self):
         """Crear solamente un picking por todas las ventas, agrupando las lineas."""
         Picking = self.env['stock.picking']
+        # If no email is set on the user, the picking creation and validation will fail be cause of
+        # the 'Unable to log message, please configure the sender's email address.' error.
+        # We disable the tracking in this case.
+        if not self.env.user.partner_id.email:
+            Picking = Picking.with_context(tracking_disable=True)
         Move = self.env['stock.move']
         StockWarehouse = self.env['stock.warehouse']
         for session in self:
@@ -76,7 +81,10 @@ class PosSession(models.Model):
                 pos_qty = any([x['qty'] > 0 for x in lineas if x['product_id'].type in ['product', 'consu']])
                 if pos_qty:
                     order_picking = Picking.create(picking_vals.copy())
-                    order_picking.message_post(body=message)
+                    if self.env.user.partner_id.email:
+                        order_picking.message_post(body=message)
+                    else:
+                        order_picking.sudo().message_post(body=message)
                 neg_qty = any([x['qty'] < 0 for x in lineas if x['product_id'].type in ['product', 'consu']])
                 if neg_qty:
                     return_vals = picking_vals.copy()
@@ -86,7 +94,10 @@ class PosSession(models.Model):
                         'picking_type_id': return_pick_type.id
                     })
                     return_picking = Picking.create(return_vals)
-                    return_picking.message_post(body=message)
+                    if self.env.user.partner_id.email:
+                        return_picking.message_post(body=message)
+                    else:
+                        return_picking.message_post(body=message)
 
             for line in [l for l in lineas if not float_is_zero(l['qty'], precision_rounding=l['product_id'].uom_id.rounding)]:
                 moves |= Move.create({
@@ -105,22 +116,13 @@ class PosSession(models.Model):
             session.write({'order_picking_id': order_picking.id, 'return_picking_id': return_picking.id})
 
             if return_picking:
-                return_picking.action_assign()
-                return_picking.force_assign()
-                for move in return_picking.move_lines:
-                    move.quantity_done = move.product_uom_qty
-                return_picking.action_done()
+                order._force_picking_done(return_picking)
             if order_picking:
-                order_picking.action_assign()
-                order_picking.force_assign()
-                for move in order_picking.move_lines:
-                    move.quantity_done = move.product_uom_qty
-                order_picking.action_done()
+                order._force_picking_done(order_picking)
 
             # when the pos.config has no picking_type_id set only the moves will be created
             if moves and not return_picking and not order_picking:
                 moves._action_assign()
-                moves.filtered(lambda m: m.state in ['confirmed', 'waiting'])._force_assign()
                 moves.filtered(lambda m: m.product_id.tracking == 'none')._action_done()
 
         return True
