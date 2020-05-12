@@ -31,7 +31,7 @@ class PosSession(models.Model):
         StockWarehouse = self.env['stock.warehouse']
         for session in self:
             if not session.order_picking_id and not session.return_picking_id:
-                logging.warn('pos_masivo: session'+str(session))
+                logging.warn('pos_masivo: session '+str(session))
                 lineas_agrupadas = {}
                 for order in session.order_ids.filtered(lambda l: not l.picking_id):
                     for line in order.lines.filtered(lambda l: l.product_id.type in ['product', 'consu']):
@@ -50,7 +50,7 @@ class PosSession(models.Model):
                             lineas_agrupadas[llave]['qty'] += line.qty
 
                 lineas = list(lineas_agrupadas.values())
-                logging.warn('pos_masivo: lineas'+str(lineas))
+                logging.warn('pos_masivo: lineas '+str(lineas))
                 if not lineas:
                     continue
 
@@ -83,7 +83,7 @@ class PosSession(models.Model):
                         'location_dest_id': destination_id,
                         'cuenta_analitica_id': session.config_id.analytic_account_id.id if session.config_id.analytic_account_id else False,
                     }
-                    logging.warn('pos_masivo: picking_vals'+str(picking_vals))
+                    logging.warn('pos_masivo: picking_vals '+str(picking_vals))
                     pos_qty = any([x['qty'] > 0 for x in lineas if x['product_id'].type in ['product', 'consu']])
                     if pos_qty:
                         order_picking = Picking.create(picking_vals.copy())
@@ -117,17 +117,19 @@ class PosSession(models.Model):
                         'location_id': location_id if line['qty'] >= 0 else destination_id,
                         'location_dest_id': destination_id if line['qty'] >= 0 else return_pick_type != picking_type and return_pick_type.default_location_dest_id.id or location_id,
                     })
-                logging.warn('pos_masivo: moves'+str(moves))
+                logging.warn('pos_masivo: moves '+str(moves))
 
                 # prefer associating the regular order picking, not the return
                 session.write({'order_picking_id': order_picking.id, 'return_picking_id': return_picking.id})
 
                 if return_picking:
-                    logging.warn('pos_masivo: return_picking'+str(return_picking))
-                    Order.sudo()._force_picking_done()
+                    logging.warn('pos_masivo: return_picking '+str(return_picking))
+                    return_picking.sudo().action_assign()
+                    return_picking.sudo().action_done()
                 if order_picking:
-                    logging.warn('pos_masivo: order_picking'+str(order_picking))
-                    Order.sudo()._force_picking_done()
+                    logging.warn('pos_masivo: order_picking '+str(order_picking))
+                    order_picking.sudo().action_assign()
+                    order_picking.sudo().action_done()
 
                 # when the pos.config has no picking_type_id set only the moves will be created
                 if moves and not return_picking and not order_picking:
