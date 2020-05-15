@@ -9,13 +9,14 @@ import logging
 class PosSession(models.Model):
     _inherit = 'pos.session'
 
-    order_picking_id = fields.Many2one('stock.picking', string='Salidas', readonly=True, copy=False)
-    return_picking_id = fields.Many2one('stock.picking', string='Devoluciones', readonly=True, copy=False)
+    order_picking_id = fields.Many2one('stock.picking', string='Albarán Salida', readonly=True, copy=False)
+    return_picking_id = fields.Many2one('stock.picking', string='Albarán Devolución', readonly=True, copy=False)
+    stock_inventory_id = fields.Many2one('stock.inventory', string='Ajuste de inventario', copy=False, domain="[('state','=','confirm')]")
+    proceso_masivo_generado = fields.Boolean(string='Procesado', readonly=True, copy=False)
 
     def action_pos_session_close(self):
         logging.warn('pos_masivo: action_pos_session_close')
         result = super(PosSession, self).action_pos_session_close()
-        self.create_picking()
         return result
 
     def create_picking(self):
@@ -30,10 +31,13 @@ class PosSession(models.Model):
         Move = self.env['stock.move']
         StockWarehouse = self.env['stock.warehouse']
         for session in self:
+            tiene_movimientos = False
             if not session.order_picking_id and not session.return_picking_id:
                 logging.warn('pos_masivo: session '+str(session))
                 lineas_agrupadas = {}
                 for order in session.order_ids.filtered(lambda l: not l.picking_id):
+                    if order.picking_id:
+                        tiene_movimientos = True
                     for line in order.lines.filtered(lambda l: l.product_id.type in ['product', 'consu']):
                         tipo = 'salida'
                         if line.qty < 0:
@@ -51,17 +55,19 @@ class PosSession(models.Model):
 
                 lineas = list(lineas_agrupadas.values())
                 logging.warn('pos_masivo: lineas '+str(lineas))
-                if not lineas:
+                if not lineas or tiene_movimientos:
                     continue
 
-                address = session.config_id.default_client_id.address_get(['delivery']) or {}
+                address = {}
+                if 'default_client_id' in session.config_id.fields_get():
+                    address = session.config_id.default_client_id.address_get(['delivery'])
                 picking_type = session.config_id.picking_type_id
                 return_pick_type = session.config_id.picking_type_id.return_picking_type_id or session.config_id.picking_type_id
                 order_picking = Picking
                 return_picking = Picking
                 moves = Move
                 location_id = session.config_id.stock_location_id.id
-                if session.config_id.default_client_id:
+                if 'default_client_id' in session.config_id.fields_get() and session.config_id.default_client_id:
                     destination_id = session.config_id.default_client_id.property_stock_customer.id
                 else:
                     if (not picking_type) or (not picking_type.default_location_dest_id):
@@ -81,7 +87,7 @@ class PosSession(models.Model):
                         'move_type': 'direct',
                         'location_id': location_id,
                         'location_dest_id': destination_id,
-                        'cuenta_analitica_id': session.config_id.analytic_account_id.id if session.config_id.analytic_account_id else False,
+                        'cuenta_analitica_id': session.config_id.analytic_account_id.id if ( 'analytic_account_id' in session.config_id.fields_get() and session.config_id.analytic_account_id ) else False,
                     }
                     logging.warn('pos_masivo: picking_vals '+str(picking_vals))
                     pos_qty = any([x['qty'] > 0 for x in lineas if x['product_id'].type in ['product', 'consu']])
@@ -124,12 +130,10 @@ class PosSession(models.Model):
 
                 if return_picking:
                     logging.warn('pos_masivo: return_picking '+str(return_picking))
-                    return_picking.sudo().action_assign()
-                    return_picking.sudo().action_done()
+                    session._force_picking_done(return_picking)
                 if order_picking:
                     logging.warn('pos_masivo: order_picking '+str(order_picking))
-                    order_picking.sudo().action_assign()
-                    order_picking.sudo().action_done()
+                    session._force_picking_done(order_picking)
 
                 # when the pos.config has no picking_type_id set only the moves will be created
                 if moves and not return_picking and not order_picking:
@@ -137,4 +141,32 @@ class PosSession(models.Model):
                     moves.filtered(lambda m: m.product_id.tracking == 'none')._action_done()
 
         logging.warn('pos_masivo: return')
+        return True
+        
+    def _force_picking_done(self, picking):
+        """Force picking in order to be set as done."""
+        self.ensure_one()
+        picking.action_assign()
+        
+        for move in picking.move_lines:
+            qty_done = move.product_uom_qty
+            if not float_is_zero(qty_done, precision_rounding=move.product_uom.rounding):
+                if len(move._get_move_lines()) < 2:
+                    move.quantity_done = qty_done
+                else:
+                    move._set_quantity_done(qty_done)
+
+        picking.action_done()
+        
+    def _generar_despacho(self):
+        for session in self.search([('state','=','closed'), ('proceso_masivo_generado','=',False)], limit=1, order="stop_at"):
+            logging.warn('pos_masivo: intentando session '+str(session))
+            if not session.order_picking_id and not session.return_picking_id:
+                session.create_picking()
+                
+            if session.stock_inventory_id and session.stock_inventory_id.state == 'confirm':
+                session.stock_inventory_id.action_validate()
+                
+            session.proceso_masivo_generado = True
+
         return True

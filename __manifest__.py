@@ -9,8 +9,9 @@
     'summary': 'Para restaurantes o ventas de muchas lineas. Hace más rápida cada venta.',
     'description': """ Para restaurantes o ventas de muchas lineas. Hace más rápida cada venta. """,
     'author': 'Rodrigo Fernandez',
-    'depends': ['pos_gt'],
+    'depends': ['point_of_sale'],
     'data': [
+        'data/pos_masivo_data.xml',
         'views/pos_config_view.xml',
         'views/pos_session_view.xml',
     ],

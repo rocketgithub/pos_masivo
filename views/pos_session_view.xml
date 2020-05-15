@@ -8,6 +8,8 @@
             <field name="stop_at" position="after">
                 <field name="order_picking_id"/>
                 <field name="return_picking_id"/>
+                <field name="stock_inventory_id" attrs="{'readonly': [('proceso_masivo_generado','=',True)]}"/>
+                <field name="proceso_masivo_generado"/>
             </field>
         </field>
     </record>
