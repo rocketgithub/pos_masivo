@@ -13,12 +13,7 @@ class PosSession(models.Model):
     return_picking_id = fields.Many2one('stock.picking', string='Albarán Devolución', readonly=True, copy=False)
     stock_inventory_id = fields.Many2one('stock.inventory', string='Ajuste de inventario', copy=False, domain="[('state','=','confirm')]")
     proceso_masivo_generado = fields.Boolean(string='Procesado', readonly=True, copy=False)
-
-    def action_pos_session_close(self):
-        logging.warn('pos_masivo: action_pos_session_close')
-        result = super(PosSession, self).action_pos_session_close()
-        return result
-
+        
     def create_picking(self):
         """Crear solamente un picking por todas las ventas, agrupando las lineas."""
         Order = self.env['pos.order']
@@ -165,7 +160,12 @@ class PosSession(models.Model):
                 session.create_picking()
                 
             if session.stock_inventory_id and session.stock_inventory_id.state == 'confirm':
-                session.stock_inventory_id.action_check()
+                values = session.stock_inventory_id._get_inventory_lines_values()
+                for line in session.stock_inventory_id.line_ids:
+                    for v in values:
+                        if line.product_id.id == v['product_id']:
+                            line.theoretical_qty = v['product_qty']
+                            
                 session.stock_inventory_id.action_validate()
                 
             session.proceso_masivo_generado = True
