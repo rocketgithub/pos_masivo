@@ -165,6 +165,7 @@ class PosSession(models.Model):
                 session.create_picking()
                 
             if session.stock_inventory_id and session.stock_inventory_id.state == 'confirm':
+                session.stock_inventory_id.action_check()
                 session.stock_inventory_id.action_validate()
                 
             session.proceso_masivo_generado = True
