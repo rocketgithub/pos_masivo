@@ -162,9 +162,15 @@ class PosSession(models.Model):
             if session.stock_inventory_id and session.stock_inventory_id.state == 'confirm':
                 values = session.stock_inventory_id._get_inventory_lines_values()
                 for line in session.stock_inventory_id.line_ids:
+                    logging.warn('pos_masivo: line.theoretical_qty '+str(line.theoretical_qty))
+                    logging.warn('pos_masivo: line.product_qty '+str(line.product_qty))
+                    cantidad_original = line.product_qty
                     for v in values:
                         if line.product_id.id == v['product_id']:
                             line.theoretical_qty = v['product_qty']
+                    line.product_qty = cantidad_original if cantidad_original > 0 else 0
+                    logging.warn('pos_masivo: line.theoretical_qty '+str(line.theoretical_qty))
+                    logging.warn('pos_masivo: line.product_qty '+str(line.product_qty))
                             
                 session.stock_inventory_id.action_validate()
                 
