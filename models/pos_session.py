@@ -155,7 +155,9 @@ class PosSession(models.Model):
         
     def _generar_despacho(self, actual=0, total=1):
         sesiones = self.search([('state','=','closed'), ('proceso_masivo_generado','=',False)], order="stop_at")
+        logging.warn('pos_masivo: sesiones pendientes '+str(sesiones))
         sesiones_filtradas = sesiones.filtered(lambda r: r.id % total == actual - 1)
+        logging.warn('pos_masivo: sesiones filtradas '+str(sesiones_filtradas))
         if len(sesiones_filtradas) > 0:
             sesion = sesiones_filtradas[0]
 
