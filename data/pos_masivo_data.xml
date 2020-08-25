@@ -2,7 +2,7 @@
 <odoo>
     <record id="ir_cron_reverse_entry" model="ir.cron">
         <field name="name">Generar despachos POS Masivo</field>
-        <field name="interval_number">10</field>
+        <field name="interval_number">20</field>
         <field name="interval_type">minutes</field>
         <field name="numbercall">-1</field>
         <field name="doall" eval="False"/>
