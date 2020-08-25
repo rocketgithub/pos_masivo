@@ -141,6 +141,7 @@ class PosSession(models.Model):
     def _force_picking_done(self, picking):
         """Force picking in order to be set as done."""
         self.ensure_one()
+        logging.warn('pos_masivo: action_assign')
         picking.action_assign()
         
         for move in picking.move_lines:
@@ -151,6 +152,7 @@ class PosSession(models.Model):
                 else:
                     move._set_quantity_done(qty_done)
 
+        logging.warn('pos_masivo: action_done')
         picking.action_done()
         
     def _generar_despacho(self):
@@ -160,20 +162,26 @@ class PosSession(models.Model):
                 session.create_picking()
                 
             if session.stock_inventory_id and session.stock_inventory_id.state == 'confirm':
+                logging.warn('pos_masivo: intentando inventory '+str(session.stock_inventory_id))
                 values = session.stock_inventory_id._get_inventory_lines_values()
                 for line in session.stock_inventory_id.line_ids:
+                    logging.warn('pos_masivo: line.product_id '+str(line.product_id))
                     logging.warn('pos_masivo: line.theoretical_qty '+str(line.theoretical_qty))
                     logging.warn('pos_masivo: line.product_qty '+str(line.product_qty))
                     cantidad_original = line.product_qty
                     for v in values:
-                        if line.product_id.id == v['product_id']:
+                        if line.product_id.id == v['product_id'] and 'product_qty' in v:
                             line.theoretical_qty = v['product_qty']
                     line.product_qty = cantidad_original if cantidad_original > 0 else 0
                     logging.warn('pos_masivo: line.theoretical_qty '+str(line.theoretical_qty))
                     logging.warn('pos_masivo: line.product_qty '+str(line.product_qty))
-                            
-                session.stock_inventory_id.action_validate()
+                
+                try:            
+                    session.stock_inventory_id.action_validate()
+                except UserError:
+                    logging.warn('pos_masivo: UserError ')
                 
             session.proceso_masivo_generado = True
+            logging.warn('pos_masivo: finalizada session '+str(session))
 
         return True
