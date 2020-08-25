@@ -153,8 +153,12 @@ class PosSession(models.Model):
 
         picking.action_done()
         
-    def _generar_despacho(self):
-        for session in self.search([('state','=','closed'), ('proceso_masivo_generado','=',False)], limit=1, order="stop_at"):
+    def _generar_despacho(self, actual=0, total=1):
+        sesiones = self.search([('state','=','closed'), ('proceso_masivo_generado','=',False)], order="stop_at")
+        sesiones_filtradas = sesiones.filtered(lambda r: r.id % total == actual - 1)
+        if len(sesiones_filtradas) > 0:
+            sesion = sesiones_filtradas[0]
+
             logging.warn('pos_masivo: intentando session '+str(session))
             if not session.order_picking_id and not session.return_picking_id:
                 session.create_picking()
