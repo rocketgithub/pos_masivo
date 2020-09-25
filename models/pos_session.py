@@ -162,7 +162,7 @@ class PosSession(models.Model):
         sesiones_filtradas = sesiones.filtered(lambda r: r.id % total == actual - 1)
         logging.warn('pos_masivo: sesiones filtradas '+str(sesiones_filtradas))
         if len(sesiones_filtradas) > 0:
-            sesion = sesiones_filtradas[0]
+            session = sesiones_filtradas[0]
 
             logging.warn('pos_masivo: intentando session '+str(session))
             if not session.order_picking_id and not session.return_picking_id:
