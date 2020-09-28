@@ -11,6 +11,7 @@
     'author': 'Rodrigo Fernandez',
     'depends': ['pos_gt'],
     'data': [
+        'data/pos_masivo_data.xml',
         'views/pos_config_view.xml',
         'views/pos_session_view.xml',
     ],

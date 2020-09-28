@@ -6,9 +6,8 @@ class PosOrder(models.Model):
     _inherit = 'pos.order'
 
     def create_picking(self):
-        config = self[0].config_id
-
-        if config.picking_al_cerrar:
-            return True
-        else:
-            return super(PosOrder, self).create_picking()
+        for config in self.mapped('config_id'):
+            if config.picking_al_cerrar:
+                return True
+            else:
+                return super(PosOrder, self).create_picking()
