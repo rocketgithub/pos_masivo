@@ -163,30 +163,34 @@ class PosSession(models.Model):
         logging.warn('pos_masivo: sesiones filtradas '+str(sesiones_filtradas))
         if len(sesiones_filtradas) > 0:
             session = sesiones_filtradas[0]
-
-            logging.warn('pos_masivo: intentando session '+str(session))
-            if not session.order_picking_id and not session.return_picking_id:
-                session.create_picking()
-                
-            if session.stock_inventory_id and session.stock_inventory_id.state == 'confirm':
-                logging.warn('pos_masivo: intentando inventory '+str(session.stock_inventory_id))
-                values = session.stock_inventory_id._get_inventory_lines_values()
-                for line in session.stock_inventory_id.line_ids:
-                    logging.warn('pos_masivo: line.product_id '+str(line.product_id))
-                    logging.warn('pos_masivo: line.theoretical_qty '+str(line.theoretical_qty))
-                    logging.warn('pos_masivo: line.product_qty '+str(line.product_qty))
-                    cantidad_original = line.product_qty
-                    for v in values:
-                        if line.product_id.id == v['product_id'] and 'product_qty' in v:
-                            line.theoretical_qty = v['product_qty']
-                    line.product_qty = cantidad_original if cantidad_original > 0 else 0
-                    logging.warn('pos_masivo: line.theoretical_qty '+str(line.theoretical_qty))
-                    logging.warn('pos_masivo: line.product_qty '+str(line.product_qty))
-                
-                try:            
-                    session.stock_inventory_id.action_validate()
-                except UserError:
-                    logging.warn('pos_masivo: UserError ')
+            
+            # Solo procesar sesiones que no tienen ajuste de inventario o que
+            # el ajuste de inventario no ha sido validado.
+            if not session.stock_inventory_id or session.stock_inventory_id.state != 'done':
+            
+                logging.warn('pos_masivo: intentando session '+str(session))
+                if not session.order_picking_id and not session.return_picking_id:
+                    session.create_picking()
+                    
+                if session.stock_inventory_id and session.stock_inventory_id.state == 'confirm':
+                    logging.warn('pos_masivo: intentando inventory '+str(session.stock_inventory_id))
+                    values = session.stock_inventory_id._get_inventory_lines_values()
+                    for line in session.stock_inventory_id.line_ids:
+                        logging.warn('pos_masivo: line.product_id '+str(line.product_id))
+                        logging.warn('pos_masivo: line.theoretical_qty '+str(line.theoretical_qty))
+                        logging.warn('pos_masivo: line.product_qty '+str(line.product_qty))
+                        cantidad_original = line.product_qty
+                        for v in values:
+                            if line.product_id.id == v['product_id'] and 'product_qty' in v:
+                                line.theoretical_qty = v['product_qty']
+                        line.product_qty = cantidad_original if cantidad_original > 0 else 0
+                        logging.warn('pos_masivo: line.theoretical_qty '+str(line.theoretical_qty))
+                        logging.warn('pos_masivo: line.product_qty '+str(line.product_qty))
+                    
+                    try:
+                        session.stock_inventory_id.action_validate()
+                    except UserError:
+                        logging.warn('pos_masivo: UserError')
                 
             session.proceso_masivo_generado = True
             logging.warn('pos_masivo: finalizada session '+str(session))
