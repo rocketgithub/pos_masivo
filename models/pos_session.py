@@ -1,3 +1,4 @@
+
 # -*- encoding: utf-8 -*-
 
 from odoo import models, fields, api, _
@@ -16,8 +17,8 @@ class PosSession(models.Model):
 
     def create_picking(self):
         """Crear solamente un picking por todas las ventas, agrupando las lineas."""
-        Picking = self.env['stock.picking']
-        Move = self.env['stock.move']
+        Picking = self.env['stock.picking'].with_context(company_id=self.config_id.company_id.id)
+        Move = self.env['stock.move'].with_context(company_id=self.config_id.company_id.id)
         StockWarehouse = self.env['stock.warehouse']
         for session in self:
             tiene_movimientos = False
@@ -103,6 +104,7 @@ class PosSession(models.Model):
                     'state': 'draft',
                     'location_id': location_id if line['qty'] >= 0 else destination_id,
                     'location_dest_id': destination_id if line['qty'] >= 0 else return_pick_type != picking_type and return_pick_type.default_location_dest_id.id or location_id,
+                    'company_id': session.config_id.company_id.id,
                 })
             logging.warn('pos_masivo: moves '+str(moves))
 
