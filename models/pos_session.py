@@ -26,13 +26,10 @@ class PosSession(models.Model):
         Move = self.env['stock.move']
         StockWarehouse = self.env['stock.warehouse']
         for session in self:
-            tiene_movimientos = False
             if not session.order_picking_id and not session.return_picking_id:
                 logging.warn('pos_masivo: session '+str(session))
                 lineas_agrupadas = {}
                 for order in session.order_ids.filtered(lambda l: not l.picking_id):
-                    if order.picking_id:
-                        tiene_movimientos = True
                     for line in order.lines.filtered(lambda l: l.product_id.type in ['product', 'consu']):
                         tipo = 'salida'
                         if line.qty < 0:
@@ -50,18 +47,18 @@ class PosSession(models.Model):
 
                 lineas = list(lineas_agrupadas.values())
                 logging.warn('pos_masivo: lineas '+str(lineas))
-                if not lineas or tiene_movimientos:
+                if not lineas:
                     continue
 
                 address = {}
-                if 'default_client_id' in session.config_id.fields_get():
+                if 'default_client_id' in session.config_id.fields_get() and session.config_id.default_client_id:
                     address = session.config_id.default_client_id.address_get(['delivery'])
                 picking_type = session.config_id.picking_type_id
                 return_pick_type = session.config_id.picking_type_id.return_picking_type_id or session.config_id.picking_type_id
                 order_picking = Picking
                 return_picking = Picking
                 moves = Move
-                location_id = session.config_id.stock_location_id.id
+                location_id = picking_type.default_location_src_id.id
                 if 'default_client_id' in session.config_id.fields_get() and session.config_id.default_client_id:
                     destination_id = session.config_id.default_client_id.property_stock_customer.id
                 else:
@@ -82,8 +79,9 @@ class PosSession(models.Model):
                         'move_type': 'direct',
                         'location_id': location_id,
                         'location_dest_id': destination_id,
-                        'cuenta_analitica_id': session.config_id.analytic_account_id.id if ( 'analytic_account_id' in session.config_id.fields_get() and session.config_id.analytic_account_id ) else False,
                     }
+                    if 'analytic_account_id' in session.config_id.fields_get() and session.config_id.analytic_account_id:
+                        picking_vals['cuenta_analitica_id'] = session.config_id.analytic_account_id.id
                     logging.warn('pos_masivo: picking_vals '+str(picking_vals))
                     pos_qty = any([x['qty'] > 0 for x in lineas if x['product_id'].type in ['product', 'consu']])
                     if pos_qty:
@@ -104,8 +102,8 @@ class PosSession(models.Model):
                         if self.env.user.partner_id.email:
                             return_picking.message_post(body=message)
                         else:
-                            return_picking.message_post(body=message)
-
+                            return_picking.sudo().message_post(body=message)
+                            
                 for line in [l for l in lineas if not float_is_zero(l['qty'], precision_rounding=l['product_id'].uom_id.rounding)]:
                     moves |= Move.create({
                         'name': line['name'],
@@ -155,9 +153,12 @@ class PosSession(models.Model):
         logging.warn('pos_masivo: action_done')
         picking.action_done()
         
-    def _generar_despacho(self, actual=0, total=1):
+    def _generar_despacho(self, actual=0, total=1, configs=[]):
         logging.warn('pos_masivo: actual {} total {}'.format(actual, total))
-        sesiones = self.search([('state','=','closed'), ('proceso_masivo_generado','=',False)], order="stop_at")
+        filtro = [('state','=','closed'), ('proceso_masivo_generado','=',False), ('config_id.picking_al_cerrar','=',True)]
+        if len(configs) > 0:
+            filtro.append(('config_id','in',configs))
+        sesiones = self.search(filtro, order="stop_at")
         logging.warn('pos_masivo: sesiones pendientes '+str(sesiones))
         sesiones_filtradas = sesiones.filtered(lambda r: r.id % total == actual - 1)
         logging.warn('pos_masivo: sesiones filtradas '+str(sesiones_filtradas))
@@ -196,3 +197,4 @@ class PosSession(models.Model):
             logging.warn('pos_masivo: finalizada session '+str(session))
 
         return True
+    
