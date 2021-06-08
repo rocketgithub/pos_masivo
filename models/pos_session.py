@@ -80,7 +80,7 @@ class PosSession(models.Model):
                         'location_id': location_id,
                         'location_dest_id': destination_id,
                     }
-                    if 'analytic_account_id' in session.config_id.fields_get() and session.config_id.analytic_account_id:
+                    if 'analytic_account_id' in session.config_id.fields_get() and session.config_id.analytic_account_id and 'cuenta_analitica_id' in Picking.fields_get():
                         picking_vals['cuenta_analitica_id'] = session.config_id.analytic_account_id.id
                     logging.warn('pos_masivo: picking_vals '+str(picking_vals))
                     pos_qty = any([x['qty'] > 0 for x in lineas if x['product_id'].type in ['product', 'consu']])
