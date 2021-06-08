@@ -153,7 +153,7 @@ class PosSession(models.Model):
         logging.warn('pos_masivo: action_done')
         picking.action_done()
         
-    def _generar_despacho(self, actual=0, total=1, configs=[]):
+    def _generar_despacho(self, actual=1, total=1, configs=[]):
         logging.warn('pos_masivo: actual {} total {}'.format(actual, total))
         filtro = [('state','=','closed'), ('proceso_masivo_generado','=',False), ('config_id.picking_al_cerrar','=',True)]
         if len(configs) > 0:
